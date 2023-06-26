@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Int32MultiArray
+from std_msgs.msg import Int32, Int32MultiArray
 from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from math import pi, cos, sin
@@ -12,6 +12,8 @@ class EncoderToOdomNode(Node):
         super().__init__('encoder_to_odom_node')
         self.subscription = self.create_subscription(
             Int32MultiArray, 'encoder_ticks', self.encoder_callback, 10)
+        self.reset_subscription = self.create_subscription(
+            Int32, 'reset_ticks', self.reset_callback, 10)
         self.odom_publisher = self.create_publisher(Odometry, 'odom', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
@@ -23,6 +25,15 @@ class EncoderToOdomNode(Node):
 
         # Create a timer for publishing tf at a faster rate
         self.tf_timer = self.create_timer(0.005, self.tf_callback)  # Adjust the frequency as desired (e.g., 200 Hz)
+
+    def reset_callback(self, msg):
+        reset = msg.data
+        if (reset == 1):
+            self.x = 0.0
+            self.y = 0.0
+            self.theta = 0.0
+            self.left_ticks_prev = 0
+            self.right_ticks_prev = 0
 
     def encoder_callback(self, msg):
         # Get encoder ticks for current iteration

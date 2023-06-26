@@ -18,8 +18,8 @@ class MotorRpsPublisher(Node):
 
     def cmd_vel_callback(self, msg):
         motor_rps = Float32MultiArray()
-        left_rps_r = ( ( 2 * msg.linear.x ) + ( 0.315 * msg.angular.z ) ) / ( 2 * 2 * 3.14 * 0.05 )
-        right_rps_r = - ( ( 2 * msg.linear.x ) - ( 0.315 * msg.angular.z ) ) / ( 2 * 2 * 3.14 * 0.05 )
+        left_rps_r = ( ( 2 * msg.linear.x ) + ( 0.315 * (-msg.angular.z) ) ) / ( 2 * 2 * 3.14 * 0.05 )
+        right_rps_r = - ( ( 2 * msg.linear.x ) - ( 0.315 * (-msg.angular.z) ) ) / ( 2 * 2 * 3.14 * 0.05 )
         motor_rps.data = [left_rps_r, right_rps_r]
         self.publisher.publish(motor_rps)
 
