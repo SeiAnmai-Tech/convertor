@@ -21,6 +21,9 @@ class EncoderToOdomNode(Node):
         self.y = 0.0
         self.theta = 0.0
 
+        # Create a timer for publishing tf at a faster rate
+        self.tf_timer = self.create_timer(0.005, self.tf_callback)  # Adjust the frequency as desired (e.g., 200 Hz)
+
     def encoder_callback(self, msg):
         # Get encoder ticks for current iteration
         left_ticks_curr = msg.data[0]
@@ -28,12 +31,12 @@ class EncoderToOdomNode(Node):
 
         # Convert ticks to position (assuming wheel radius = 0.1 and wheelbase = 0.5)
         dt = 0.02 # 20ms or 50 Hz
-        wheel_radius = 0.05
-        wheelbase = 0.315
-        counts_per_rev = 280
+        wheel_radius = 0.05 # 100cm diameter
+        wheelbase = 0.32 # distance between wheels
+        counts_per_rev = 275
 
         left_distance = (left_ticks_curr - self.left_ticks_prev) * (2 * pi * wheel_radius) / counts_per_rev
-        right_distance = (right_ticks_curr - self.right_ticks_prev) * (2 * pi * wheel_radius) / counts_per_rev
+        right_distance = -(right_ticks_curr - self.right_ticks_prev) * (2 * pi * wheel_radius) / counts_per_rev
 
         delta_distance = (left_distance + right_distance) / 2
         delta_theta = (right_distance - left_distance) / wheelbase
@@ -51,7 +54,7 @@ class EncoderToOdomNode(Node):
         odom = Odometry()
         odom.header.stamp = self.get_clock().now().to_msg()
         odom.header.frame_id = 'odom'
-        odom.child_frame_id = 'base_link'
+        odom.child_frame_id = 'base_footprint'
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = 0.0
@@ -86,11 +89,12 @@ class EncoderToOdomNode(Node):
 
         self.odom_publisher.publish(odom)
 
-        # Publish tf transform between "odom" and "base_link"
+    def tf_callback(self):
+        # Publish tf transform between "odom" and "base_footprint"
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = "odom"
-        transform.child_frame_id = "base_link"
+        transform.child_frame_id = "base_footprint"
         transform.transform.translation.x = self.x
         transform.transform.translation.y = self.y
         transform.transform.rotation.z = sin(self.theta / 2)

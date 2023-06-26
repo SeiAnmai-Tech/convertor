@@ -25,6 +25,7 @@ setup(
             'plot = py_pubsub.plotting:main',
             'convertor = py_pubsub.convertor:main',
             'odom = py_pubsub.odom_to_pose:main',
+            'initialpose = py_pubsub.initial_pose_publisher:main',
         ],
     },
 )
