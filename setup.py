@@ -26,6 +26,7 @@ setup(
             'convertor = py_pubsub.convertor:main',
             'odom = py_pubsub.odom_to_pose:main',
             'initialpose = py_pubsub.initial_pose_publisher:main',
+            'servo_state = py_pubsub.servo_state_publisher:main',
         ],
     },
 )
