@@ -18,7 +18,7 @@ class MoveBaseClient(Node):
         super().__init__('movebase_client_py')
 
         self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.ldis_pub = self.create_publisher(Int32, 'ldisable', 10)
+        self.sharp_dis_pub = self.create_publisher(Int32, 'sharp_disable', 10)
         self.docked_pub = self.create_publisher(Bool, 'docked', 10)
         self.subscription = self.create_subscription(Int32, 'hall_publisher', self.mcbk, 10)
         self.tf_listener = TransformListener(self)
@@ -71,8 +71,8 @@ class MoveBaseClient(Node):
                             dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
                             angular = 2.0 * math.atan2(trans[1], trans[0])
                             linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-                            ldis = Int32()
-                            ldis.data = 1
+                            sharp_dis_msg = Int32()
+                            sharp_dis_msg.data = 1
                             print(dist)
                             if dist < 0.555:
                                 cmd.linear.x = linear
@@ -90,7 +90,7 @@ class MoveBaseClient(Node):
                                 cmd.linear.x = linear
                                 cmd.angular.z = angular
                             self.publisher.publish(cmd)
-                            self.ldis_pub.publish(ldis)
+                            self.sharp_dis_pub.publish(sharp_dis_msg)
                         except (tf2.TransformException):
                             cmd.linear.x = 0
                             cmd.angular.z = 0

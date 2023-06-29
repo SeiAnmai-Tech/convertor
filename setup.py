@@ -27,6 +27,7 @@ setup(
             'odom = py_pubsub.odom_to_pose:main',
             'initialpose = py_pubsub.initial_pose_publisher:main',
             'servo_state = py_pubsub.servo_state_publisher:main',
+            'sharp = py_pubsub.sharp:main',
         ],
     },
 )
