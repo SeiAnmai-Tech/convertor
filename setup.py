@@ -28,6 +28,10 @@ setup(
             'initialpose = py_pubsub.initial_pose_publisher:main',
             'servo_state = py_pubsub.servo_state_publisher:main',
             'sharp = py_pubsub.sharp:main',
+            'sharp_lidar = py_pubsub.sharp_lidar:main',
+            'robot_navigator = py_pubsub.robot_navigator:main',
+            'gotodock = py_pubsub.gotodock:main',
+            'dock = py_pubsub.dock:main',
         ],
     },
 )
