@@ -133,7 +133,51 @@ class BasicNavigator(Node):
 
         self.result_future = self.goal_handle.get_result_async()
 
-        
+        while not self.isNavComplete():
+            pass
+
+        while self.isNavComplete():
+            result = self.getResult()
+            if result == NavigationResult.SUCCEEDED:
+                while rclpy.ok():
+                    try:
+                        (trans0, rot0) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
+                        (trans1, rot1) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
+                        trans = [0.0, 0.0, 0.0]
+                        trans[0] = (trans1.transform.translation.x + trans0.transform.translation.x) / 2.0
+                        trans[1] = (trans1.transform.translation.y + trans0.transform.translation.y) / 2.0
+                        trans[2] = (trans1.transform.translation.z + trans0.transform.translation.z) / 2.0
+                        dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
+                        angular = 2.0 * math.atan2(trans[1], trans[0])
+                        linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
+                        sharp_dis_msg = Int32()
+                        sharp_dis_msg.data = 1
+                        print(dist)
+                        if dist < 0.555:
+                            self.cmd.linear.x = linear
+                            self.cmd.angular.z = angular
+                            self.publisher.publish(self.cmd)
+                            time.sleep(0.2)
+                            self.cmd.linear.x = 0
+                            self.cmd.angular.z = 0
+                            docked = Bool()
+                            docked.data = True
+                            self.publisher.publish(self.cmd)
+                            self.docked_pub.publish(docked)
+                            return
+                        elif dist >= 0.56:
+                            self.cmd.linear.x = linear
+                            self.cmd.angular.z = angular
+                            self.publisher.publish(self.cmd)
+                            self.sharp_dis_pub.publish(sharp_dis_msg)
+                    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                        self.cmd.linear.x = 0
+                        self.cmd.angular.z = 0
+                        continue
+            else:
+                # get_logger().error('Action server not available!')
+                # get_logger().info('Navigation test finished.')
+                return
 
         return True
 
@@ -298,48 +342,7 @@ def main():
   i = 0
 
   # Keep doing stuff as long as the robot is moving towards the goal
-  while navigator.isNavComplete():
-    result = navigator.getResult()
-    if result == NavigationResult.SUCCEEDED:
-        while rclpy.ok():
-            try:
-                (trans0, rot0) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
-                (trans1, rot1) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
-                trans = [0.0, 0.0, 0.0]
-                trans[0] = (trans1.transform.translation.x + trans0.transform.translation.x) / 2.0
-                trans[1] = (trans1.transform.translation.y + trans0.transform.translation.y) / 2.0
-                trans[2] = (trans1.transform.translation.z + trans0.transform.translation.z) / 2.0
-                dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-                angular = 2.0 * math.atan2(trans[1], trans[0])
-                linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-                sharp_dis_msg = Int32()
-                sharp_dis_msg.data = 1
-                print(dist)
-                if dist < 0.555:
-                    self.cmd.linear.x = linear
-                    self.cmd.angular.z = angular
-                    self.publisher.publish(self.cmd)
-                    time.sleep(0.2)
-                    self.cmd.linear.x = 0
-                    self.cmd.angular.z = 0
-                    docked = Bool()
-                    docked.data = True
-                    self.publisher.publish(self.cmd)
-                    self.docked_pub.publish(docked)
-                    return
-                elif dist >= 0.56:
-                    self.cmd.linear.x = linear
-                    self.cmd.angular.z = angular
-                    self.publisher.publish(self.cmd)
-                    self.sharp_dis_pub.publish(sharp_dis_msg)
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                self.cmd.linear.x = 0
-                self.cmd.angular.z = 0
-                continue
-    else:
-        # get_logger().error('Action server not available!')
-        # get_logger().info('Navigation test finished.')
-        return
+  
 
   # Shut down the ROS 2 Navigation Stack
 #   navigator.lifecycleShutdown()

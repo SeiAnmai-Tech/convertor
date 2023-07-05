@@ -32,6 +32,10 @@ setup(
             'robot_navigator = py_pubsub.robot_navigator:main',
             'gotodock = py_pubsub.gotodock:main',
             'dock = py_pubsub.dock:main',
+            'aruco_dock = py_pubsub.aruco_dock:main',
+            'maptoimage = py_pubsub.maptoimage:main',
+            'imagecompressor = py_pubsub.imagecompressor:main',
+            'rposepub = py_pubsub.rposepub:main',
         ],
     },
 )
