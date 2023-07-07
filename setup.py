@@ -31,7 +31,7 @@ setup(
             'sharp_lidar = py_pubsub.sharp_lidar:main',
             'robot_navigator = py_pubsub.robot_navigator:main',
             'gotodock = py_pubsub.gotodock:main',
-            'dock = py_pubsub.dock:main',
+            'go_to_origin = py_pubsub.go_to_origin:main',
             'aruco_dock = py_pubsub.aruco_dock:main',
             'maptoimage = py_pubsub.maptoimage:main',
             'imagecompressor = py_pubsub.imagecompressor:main',

@@ -35,6 +35,12 @@ from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSReliabilityPolicy
 from rclpy.qos import QoSProfile
 
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Int32, Bool
+from tf2_ros import TransformListener, Buffer
+from tf2_geometry_msgs import do_transform_pose
+import tf2_ros
+import math
 
 class NavigationResult(Enum):
     UKNOWN = 0
@@ -82,6 +88,19 @@ class BasicNavigator(Node):
             ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
         self.get_costmap_global_srv = self.create_client(GetCostmap, '/global_costmap/get_costmap')
         self.get_costmap_local_srv = self.create_client(GetCostmap, '/local_costmap/get_costmap')
+
+        # self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        # self.docked_pub = self.create_publisher(Bool, 'docked', 10)
+        # self.tf_buffer = Buffer(Duration(seconds=10))
+        # self.tf_listener = TransformListener(self.tf_buffer, self)
+        # self.cmd = Twist()
+        # self.cmd.linear.x = 0.0
+        # self.cmd.linear.y = 0.0
+        # self.cmd.linear.z = 0.0
+        # self.cmd.angular.x = 0.0
+        # self.cmd.angular.y = 0.0
+        # self.cmd.angular.z = 0.0
+        # self.docked = Bool()
 
     def setInitialPose(self, initial_pose):
         self.initial_pose_received = False
@@ -132,53 +151,6 @@ class BasicNavigator(Node):
             return False
 
         self.result_future = self.goal_handle.get_result_async()
-
-        while not self.isNavComplete():
-            pass
-
-        while self.isNavComplete():
-            result = self.getResult()
-            if result == NavigationResult.SUCCEEDED:
-                while rclpy.ok():
-                    try:
-                        (trans0, rot0) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
-                        (trans1, rot1) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
-                        trans = [0.0, 0.0, 0.0]
-                        trans[0] = (trans1.transform.translation.x + trans0.transform.translation.x) / 2.0
-                        trans[1] = (trans1.transform.translation.y + trans0.transform.translation.y) / 2.0
-                        trans[2] = (trans1.transform.translation.z + trans0.transform.translation.z) / 2.0
-                        dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-                        angular = 2.0 * math.atan2(trans[1], trans[0])
-                        linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-                        sharp_dis_msg = Int32()
-                        sharp_dis_msg.data = 1
-                        print(dist)
-                        if dist < 0.555:
-                            self.cmd.linear.x = linear
-                            self.cmd.angular.z = angular
-                            self.publisher.publish(self.cmd)
-                            time.sleep(0.2)
-                            self.cmd.linear.x = 0
-                            self.cmd.angular.z = 0
-                            docked = Bool()
-                            docked.data = True
-                            self.publisher.publish(self.cmd)
-                            self.docked_pub.publish(docked)
-                            return
-                        elif dist >= 0.56:
-                            self.cmd.linear.x = linear
-                            self.cmd.angular.z = angular
-                            self.publisher.publish(self.cmd)
-                            self.sharp_dis_pub.publish(sharp_dis_msg)
-                    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                        self.cmd.linear.x = 0
-                        self.cmd.angular.z = 0
-                        continue
-            else:
-                # get_logger().error('Action server not available!')
-                # get_logger().info('Navigation test finished.')
-                return
-
         return True
 
     def followWaypoints(self, poses):
@@ -315,39 +287,140 @@ Navigates a robot from an initial pose to a goal pose.
 '''
 def main():
 
-  # Start the ROS 2 Python Client Library
-  rclpy.init()
+    # Start the ROS 2 Python Client Library
+    rclpy.init()
 
-  # Launch the ROS 2 Navigation Stack
-  navigator = BasicNavigator()
+    # Launch the ROS 2 Navigation Stack
+    navigator = BasicNavigator()
 
-  # Wait for navigation to fully activate. Use this line if autostart is set to true.
-#   navigator.waitUntilNav2Active()
+    # Set the robot's initial pose if necessary
+    # initial_pose = PoseStamped()
+    # initial_pose.header.frame_id = 'map'
+    # initial_pose.header.stamp = navigator.get_clock().now().to_msg()
+    # initial_pose.pose.position.x = 0.0
+    # initial_pose.pose.position.y = 0.0
+    # initial_pose.pose.position.z = 0.0
+    # initial_pose.pose.orientation.x = 0.0
+    # initial_pose.pose.orientation.y = 0.0
+    # initial_pose.pose.orientation.z = 0.0
+    # initial_pose.pose.orientation.w = 1.0
+    # navigator.setInitialPose(initial_pose)
 
-  # Set the robot's goal pose
-  goal_pose = PoseStamped()
-  goal_pose.header.frame_id = 'map'
-  goal_pose.header.stamp = navigator.get_clock().now().to_msg()
-  goal_pose.pose.position.x = 0.0
-  goal_pose.pose.position.y = 0.0
-  goal_pose.pose.position.z = 0.0
-  goal_pose.pose.orientation.x = 0.0
-  goal_pose.pose.orientation.y = 0.0
-  goal_pose.pose.orientation.z = 0.0
-  goal_pose.pose.orientation.w = -1.0
+    # Activate navigation, if not autostarted. This should be called after setInitialPose()
+    # or this will initialize at the origin of the map and update the costmap with bogus readings.
+    # If autostart, you should `waitUntilNav2Active()` instead.
+    # navigator.lifecycleStartup()
 
-  # Go to the goal pose
-  navigator.goToPose(goal_pose)
+    # Wait for navigation to fully activate. Use this line if autostart is set to true.
+    #   navigator.waitUntilNav2Active()
 
-  i = 0
+    # If desired, you can change or load the map as well
+    # navigator.changeMap('/path/to/map.yaml')
 
-  # Keep doing stuff as long as the robot is moving towards the goal
-  
+    # You may use the navigator to clear or obtain costmaps
+    # navigator.clearAllCostmaps()  # also have clearLocalCostmap() and clearGlobalCostmap()
+    # global_costmap = navigator.getGlobalCostmap()
+    # local_costmap = navigator.getLocalCostmap()
 
-  # Shut down the ROS 2 Navigation Stack
-#   navigator.lifecycleShutdown()
+    # Set the robot's goal pose
+    goal_pose = PoseStamped()
+    goal_pose.header.frame_id = 'map'
+    goal_pose.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose.pose.position.x = 0.0
+    goal_pose.pose.position.y = 0.0
+    goal_pose.pose.position.z = 0.0
+    goal_pose.pose.orientation.x = 0.0
+    goal_pose.pose.orientation.y = 0.0
+    goal_pose.pose.orientation.z = 1.0
+    goal_pose.pose.orientation.w = 0.0
 
-  exit(0)
+    # go_to_aruco_loop = False
+
+    # sanity check a valid path exists
+    # path = navigator.getPath(initial_pose, goal_pose)
+
+    # Go to the goal pose
+    navigator.goToPose(goal_pose)
+
+    i = 0
+
+    # Keep doing stuff as long as the robot is moving towards the goal
+    while not navigator.isNavComplete():
+        ################################################
+        #
+        # Implement some code here for your application!
+        #
+        ################################################
+
+        # Do something with the feedback
+        i = i + 1
+        feedback = navigator.getFeedback()
+        if feedback and i % 5 == 0:
+            print('Distance remaining: ' + '{:.2f}'.format(feedback.distance_remaining) + ' meters.')
+
+        # Some navigation timeout to demo cancellation
+        if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
+            navigator.cancelNav()
+
+        # Some navigation request change to demo preemption
+        if Duration.from_msg(feedback.navigation_time) > Duration(seconds=120.0):
+            goal_pose.pose.position.x = -3.0
+            navigator.goToPose(goal_pose)
+
+    # Do something depending on the return code
+    result = navigator.getResult()
+    if result == NavigationResult.SUCCEEDED:
+        print('Goal succeeded!')
+    elif result == NavigationResult.CANCELED:
+        print('Goal was canceled!')
+    elif result == NavigationResult.FAILED:
+        print('Goal failed!')
+    else:
+        print('Goal has an invalid return status!')
+
+    # if (navigator.isNavComplete()):
+    #     go_to_aruco_loop = True
+
+    # while go_to_aruco_loop==True:
+    #     try:
+    #         transform0 = navigator.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
+    #         transform1 = navigator.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
+            
+    #         trans0 = transform0.transform.translation
+    #         trans1 = transform1.transform.translation
+
+    #         trans = [0.0, 0.0, 0.0]
+    #         trans[0] = (trans1.x + trans0.x) / 2.0
+    #         trans[1] = (trans1.y + trans0.y) / 2.0
+    #         trans[2] = (trans1.z + trans0.z) / 2.0
+
+    #         dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
+    #         angular = 2.0 * math.atan2(trans[1], trans[0])
+    #         linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
+    #         print(dist)
+
+    #         if dist < 0.53 and navigator.docked.data == False:
+    #             navigator.cmd.linear.x = linear
+    #             navigator.cmd.angular.z = angular
+    #             navigator.publisher.publish(navigator.cmd)
+    #             time.sleep(0.2)
+    #             navigator.cmd.linear.x = 0.0
+    #             navigator.cmd.angular.z = 0.0
+    #             navigator.docked.data = True
+    #             navigator.publisher.publish(self.cmd)
+    #             navigator.docked_pub.publish(self.docked)
+    #             go_to_aruco_loop = False
+
+    #         if dist >= 0.53:
+    #             navigator.cmd.linear.x = linear
+    #             navigator.cmd.angular.z = angular
+    #             navigator.publisher.publish(navigator.cmd)
+
+    #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+    #         navigator.cmd.linear.x = 0.0
+    #         navigator.cmd.angular.z = 0.0
+
+    exit(0)
 
 if __name__ == '__main__':
   main()

@@ -1,4 +1,4 @@
-from rclpy.duration import Duration # Handles time for ROS 2
+from rclpy.duration import Duration
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
@@ -64,10 +64,10 @@ class ArucoDock(Node):
             self.cmd.linear.x = 0.0
             self.cmd.angular.z = 0.0
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = ArucoDock()
+    node.timer_callback()
     rclpy.spin(node)
     rclpy.shutdown()
 
