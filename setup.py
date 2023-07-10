@@ -36,6 +36,7 @@ setup(
             'maptoimage = py_pubsub.maptoimage:main',
             'imagecompressor = py_pubsub.imagecompressor:main',
             'rposepub = py_pubsub.rposepub:main',
+            'pico_reset=py_pubsub.pico_reset:main',
         ],
     },
 )

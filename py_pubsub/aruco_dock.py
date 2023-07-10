@@ -16,7 +16,7 @@ class ArucoDock(Node):
         self.docked_pub = self.create_publisher(Bool, 'docked', 10)
         self.tf_buffer = Buffer(Duration(seconds=10))
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.timer = self.create_timer(0.05, self.timer_callback)
+        self.timer = self.create_timer(0.1, self.timer_callback)
         self.cmd = Twist()
         self.cmd.linear.x = 0.0
         self.cmd.linear.y = 0.0
@@ -43,7 +43,7 @@ class ArucoDock(Node):
             linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
             print(dist)
 
-            if dist < 0.53:
+            if dist < 0.525:
                 # self.cmd.linear.x = linear
                 # self.cmd.angular.z = angular
                 # self.publisher.publish(self.cmd)
@@ -55,7 +55,7 @@ class ArucoDock(Node):
                 self.publisher.publish(self.cmd)
                 self.docked_pub.publish(docked)
                 return
-            elif dist >= 0.53:
+            elif dist >= 0.525:
                 self.cmd.linear.x = linear
                 self.cmd.angular.z = angular
                 self.publisher.publish(self.cmd)
