@@ -14,16 +14,12 @@
 # limitations under the License.
 #
 # Modified by AutomaticAddison.com
- 
+
 import time  # Time library
- 
+
 from geometry_msgs.msg import PoseStamped # Pose with ref frame and timestamp
 from rclpy.duration import Duration # Handles time for ROS 2
-import rclpy # Python client library for ROS 2
-  
-'''
-Navigates a robot from an initial pose to a goal pose.
-'''
+
 from enum import Enum
 
 from action_msgs.msg import GoalStatus
@@ -32,25 +28,27 @@ from lifecycle_msgs.srv import GetState
 from nav2_msgs.action import NavigateThroughPoses, NavigateToPose, FollowWaypoints, ComputePathToPose, ComputePathThroughPoses
 from nav2_msgs.srv import LoadMap, ClearEntireCostmap, ManageLifecycleNodes, GetCostmap
 
+import rclpy
+
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSReliabilityPolicy
 from rclpy.qos import QoSProfile
 
-from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32, Bool
 from tf2_ros import TransformListener, Buffer
 from tf2_geometry_msgs import do_transform_pose
-from action_msgs.msg import GoalStatusArray
 import tf2_ros
 import math
-import time
+
+from geometry_msgs.msg import Pose, Twist
 
 class NavigationResult(Enum):
-    UNKNOWN = 0
+    UKNOWN = 0
     SUCCEEDED = 1
     CANCELED = 2
     FAILED = 3 
+
 
 class BasicNavigator(Node):
     def __init__(self):
@@ -62,109 +60,101 @@ class BasicNavigator(Node):
         self.feedback = None
         self.status = None
 
-        amcl_pose_qos = QoSProfile(durability=QoSDurabilityPolicy.TRANSIENT_LOCAL, reliability=QoSReliabilityPolicy.RELIABLE, history=QoSHistoryPolicy.KEEP_LAST, depth=1)
+        amcl_pose_qos = QoSProfile(
+          durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+          reliability=QoSReliabilityPolicy.RELIABLE,
+          history=QoSHistoryPolicy.KEEP_LAST,
+          depth=1)
 
         self.initial_pose_received = False
-        self.nav_through_poses_client = ActionClient(self, NavigateThroughPoses, 'navigate_through_poses')
+        self.nav_through_poses_client = ActionClient(self,
+                                                     NavigateThroughPoses,
+                                                     'navigate_through_poses')
         self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         self.follow_waypoints_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
         self.compute_path_to_pose_client = ActionClient(self, ComputePathToPose, 'compute_path_to_pose')
-        self.compute_path_through_poses_client = ActionClient(self, ComputePathThroughPoses, 'compute_path_through_poses')
-        self.localization_pose_sub = self.create_subscription(PoseWithCovarianceStamped, 'amcl_pose', self._amclPoseCallback, amcl_pose_qos)
-        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 10)
+        self.compute_path_through_poses_client = ActionClient(self, ComputePathThroughPoses,
+                                                              'compute_path_through_poses')
+        self.localization_pose_sub = self.create_subscription(PoseWithCovarianceStamped,
+                                                              'amcl_pose',
+                                                              self._amclPoseCallback,
+                                                              amcl_pose_qos)
+        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped,
+                                                      'initialpose',
+                                                      10)
         self.change_maps_srv = self.create_client(LoadMap, '/map_server/load_map')
-        self.clear_costmap_global_srv = self.create_client(ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
-        self.clear_costmap_local_srv = self.create_client(ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
+        self.clear_costmap_global_srv = self.create_client(
+            ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
+        self.clear_costmap_local_srv = self.create_client(
+            ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
         self.get_costmap_global_srv = self.create_client(GetCostmap, '/global_costmap/get_costmap')
         self.get_costmap_local_srv = self.create_client(GetCostmap, '/local_costmap/get_costmap')
 
-        self.goal_pose = PoseStamped()
-        self.goal_pose.header.frame_id = 'map'
-        self.goal_pose.header.stamp = self.get_clock().now().to_msg()
-        self.goal_pose.pose.position.x = 0.0
-        self.goal_pose.pose.position.y = 0.0
-        self.goal_pose.pose.position.z = 0.0
-        self.goal_pose.pose.orientation.x = 0.0
-        self.goal_pose.pose.orientation.y = 0.0
-        self.goal_pose.pose.orientation.z = 0.0
-        self.goal_pose.pose.orientation.w = 1.0
+        self.pose1 = None
+        self.pose2 = None
+
+        self.subscription1 = self.create_subscription(
+            Pose,
+            '/aruco_double/pose',
+            self.pose1_callback,
+            10
+        )
+
+        self.subscription2 = self.create_subscription(
+            Pose,
+            '/aruco_double/pose2',
+            self.pose2_callback,
+            10
+        )
+        
+        self.docked_pub = self.create_publisher(Bool, 'docked', 10)
 
         self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.sharp_dis_pub = self.create_publisher(Int32, 'sharp_disable', 10)
-        self.docked_pub = self.create_publisher(Bool, 'docked', 10)
-        self.subscription = self.create_subscription(Int32, 'hall_publisher', self.mcbk, 10)
-        self.tf_buffer = Buffer(Duration(seconds=10))
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.cmd = Twist()
+        self.cmd.linear.x = 0.0
+        self.cmd.linear.y = 0.0
+        self.cmd.linear.z = 0.0
+        self.cmd.angular.x = 0.0
+        self.cmd.angular.y = 0.0
+        self.cmd.angular.z = 0.0
+
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.magnet = 0
 
-        self.xpos = [0.0, -0.5]
-        self.ypos = [0.0, 0.0]
-        self.i = 0
+    def pose1_callback(self, msg):
+        self.pose1 = msg
+        # self.get_logger().info('Received Pose1')
 
-        self.cmd = Twist()
-
-        # Wait for navigation to fully activate. Use this line if autostart is set to true.
-        # self.waitUntilNav2Active()
-        # Go to the goal pose
-        self.goToPose(self.goal_pose)
-        
-
-    def mcbk(self, msg):
-        self.magnet = msg.data
-
-    def timer_callback(self):
-        self.i = 0
-        result = self.getResult()
-        # Keep doing stuff as long as the robot is moving towards the goal
-        if self.isNavComplete():
-            if result == NavigationResult.SUCCEEDED:
-                while rclpy.ok():
-                    try:
-                        (trans0, rot0) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
-                        (trans1, rot1) = self.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
-                        trans = [0.0, 0.0, 0.0]
-                        trans[0] = (trans1.transform.translation.x + trans0.transform.translation.x) / 2.0
-                        trans[1] = (trans1.transform.translation.y + trans0.transform.translation.y) / 2.0
-                        trans[2] = (trans1.transform.translation.z + trans0.transform.translation.z) / 2.0
-                        dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-                        angular = 2.0 * math.atan2(trans[1], trans[0])
-                        linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-                        sharp_dis_msg = Int32()
-                        sharp_dis_msg.data = 1
-                        print(dist)
-                        if dist < 0.555:
-                            self.cmd.linear.x = linear
-                            self.cmd.angular.z = angular
-                            self.publisher.publish(self.cmd)
-                            time.sleep(0.2)
-                            self.cmd.linear.x = 0
-                            self.cmd.angular.z = 0
-                            docked = Bool()
-                            docked.data = True
-                            self.publisher.publish(self.cmd)
-                            self.docked_pub.publish(docked)
-                            return
-                        elif dist >= 0.56:
-                            self.cmd.linear.x = linear
-                            self.cmd.angular.z = angular
-                            self.publisher.publish(self.cmd)
-                            self.sharp_dis_pub.publish(sharp_dis_msg)
-                    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                        self.cmd.linear.x = 0
-                        self.cmd.angular.z = 0
-                        continue
-            else:
-                # get_logger().error('Action server not available!')
-                # get_logger().info('Navigation test finished.')
-                return
-
+    def pose2_callback(self, msg):
+        self.pose2 = msg
+        # self.get_logger().info('Received Pose2')
+    
     def setInitialPose(self, initial_pose):
         self.initial_pose_received = False
         self.initial_pose = initial_pose
         self._setInitialPose()
 
+    def goThroughPoses(self, poses):
+        # Sends a `NavThroughPoses` action request
+        self.debug("Waiting for 'NavigateThroughPoses' action server")
+        while not self.nav_through_poses_client.wait_for_server(timeout_sec=1.0):
+            self.info("'NavigateThroughPoses' action server not available, waiting...")
+
+        goal_msg = NavigateThroughPoses.Goal()
+        goal_msg.poses = poses
+
+        self.info('Navigating with ' + str(len(goal_msg.poses)) + ' goals.' + '...')
+        send_goal_future = self.nav_through_poses_client.send_goal_async(goal_msg,
+                                                                         self._feedbackCallback)
+        rclpy.spin_until_future_complete(self, send_goal_future)
+        self.goal_handle = send_goal_future.result()
+
+        if not self.goal_handle.accepted:
+            self.error('Goal with ' + str(len(poses)) + ' poses was rejected!')
+            return False
+
+        self.result_future = self.goal_handle.get_result_async()
+        return True
 
     def goToPose(self, pose):
         # Sends a `NavToPose` action request
@@ -175,13 +165,16 @@ class BasicNavigator(Node):
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = pose
 
-        self.info('Navigating to goal: ' + str(pose.pose.position.x) + ' ' + str(pose.pose.position.y) + '...')
-        send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg, self._feedbackCallback)
+        self.info('Navigating to goal: ' + str(pose.pose.position.x) + ' ' +
+                      str(pose.pose.position.y) + '...')
+        send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg,
+                                                                   self._feedbackCallback)
         rclpy.spin_until_future_complete(self, send_goal_future)
         self.goal_handle = send_goal_future.result()
 
         if not self.goal_handle.accepted:
-            self.error('Goal to ' + str(pose.pose.position.x) + ' ' + str(pose.pose.position.y) + ' was rejected!')
+            self.error('Goal to ' + str(pose.pose.position.x) + ' ' +
+                           str(pose.pose.position.y) + ' was rejected!')
             return False
 
         self.result_future = self.goal_handle.get_result_async()
@@ -209,6 +202,13 @@ class BasicNavigator(Node):
         self.result_future = self.goal_handle.get_result_async()
         return True
 
+    def cancelNav(self):
+        self.info('Canceling current goal.')
+        if self.result_future:
+            future = self.goal_handle.cancel_goal_async()
+            rclpy.spin_until_future_complete(self, future)
+        return
+
     def isNavComplete(self):
         if not self.result_future:
             # task was cancelled or completed
@@ -225,6 +225,9 @@ class BasicNavigator(Node):
 
         self.debug('Goal succeeded!')
         return True
+
+    def getFeedback(self):
+        return self.feedback
 
     def getResult(self):
         if self.status == GoalStatus.STATUS_SUCCEEDED:
@@ -306,12 +309,92 @@ class BasicNavigator(Node):
         self.get_logger().debug(msg)
         return
 
-def main(args=None):
-    rclpy.init(args=args)
-    basic_navigator = BasicNavigator()
-    rclpy.spin(basic_navigator)
-    basic_navigator.destroy_node()
-    rclpy.shutdown()
+'''
+Navigates a robot from an initial pose to a goal pose.
+'''
+def main():
+
+    # Start the ROS 2 Python Client Library
+    rclpy.init()
+
+    # Launch the ROS 2 Navigation Stack
+    navigator = BasicNavigator()
+
+    # Set the robot's goal pose
+    goal_pose = PoseStamped()
+    goal_pose.header.frame_id = 'map'
+    goal_pose.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose.pose.position.x = 0.0
+    goal_pose.pose.position.y = 0.0
+    goal_pose.pose.position.z = 0.0
+    goal_pose.pose.orientation.x = 0.0
+    goal_pose.pose.orientation.y = 0.0
+    goal_pose.pose.orientation.z = 1.0
+    goal_pose.pose.orientation.w = 0.0
+
+    # Go to the goal pose
+    navigator.goToPose(goal_pose)
+
+    i = 0
+
+    # Keep doing stuff as long as the robot is moving towards the goal
+    while not navigator.isNavComplete():
+
+        # Do something with the feedback
+        i = i + 1
+        feedback = navigator.getFeedback()
+        if feedback and i % 5 == 0:
+            print('Distance remaining: ' + '{:.2f}'.format(feedback.distance_remaining) + ' meters.')
+
+        # Some navigation timeout to demo cancellation
+        if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
+            navigator.cancelNav()
+
+        # Some navigation request change to demo preemption
+        if Duration.from_msg(feedback.navigation_time) > Duration(seconds=120.0):
+            goal_pose.pose.position.x = -3.0
+            navigator.goToPose(goal_pose)
+
+    # Do something depending on the return code
+    result = navigator.getResult()
+    if result == NavigationResult.SUCCEEDED:
+        print('Goal succeeded!')
+    elif result == NavigationResult.CANCELED:
+        print('Goal was canceled!')
+    elif result == NavigationResult.FAILED:
+        print('Goal failed!')
+    else:
+        print('Goal has an invalid return status!')
+
+    while navigator.isNavComplete():
+
+        trans = [0.0, 0.0, 0.0]
+        trans[0] = (navigator.pose1.position.z + navigator.pose2.position.z) / 2.0
+        trans[1] = (- navigator.pose1.position.x - navigator.pose2.position.x) / 2.0
+        trans[2] = (- navigator.pose1.position.y - navigator.pose2.position.y) / 2.0
+
+        dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
+        angular = 2.0 * math.atan2(trans[1], trans[0])
+        linear = 0.1 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
+        print(dist)
+
+        if dist < 0.165:
+            # self.cmd.linear.x = linear
+            # self.cmd.angular.z = angular
+            # self.publisher.publish(self.cmd)
+            # time.sleep(0.2)
+            navigator.cmd.linear.x = 0.0
+            navigator.cmd.angular.z = 0.0
+            docked = Bool()
+            docked.data = navigator
+            navigator.publisher.publish(navigator.cmd)
+            navigator.docked_pub.publish(docked)
+            exit(0)
+        elif dist >= 0.165:
+            navigator.cmd.linear.x = linear
+            navigator.cmd.angular.z = angular
+            navigator.publisher.publish(navigator.cmd)
+
 
 if __name__ == '__main__':
-    main()
+  main()

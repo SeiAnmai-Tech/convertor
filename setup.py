@@ -33,10 +33,11 @@ setup(
             'gotodock = py_pubsub.gotodock:main',
             'go_to_origin = py_pubsub.go_to_origin:main',
             'aruco_dock = py_pubsub.aruco_dock:main',
+            'aruco_dock_2 = py_pubsub.aruco_dock_2:main',
             'maptoimage = py_pubsub.maptoimage:main',
             'imagecompressor = py_pubsub.imagecompressor:main',
             'rposepub = py_pubsub.rposepub:main',
-            'pico_reset=py_pubsub.pico_reset:main',
+            'pico_reset = py_pubsub.pico_reset:main',
         ],
     },
 )
