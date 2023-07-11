@@ -31,6 +31,8 @@ setup(
             'sharp_lidar = py_pubsub.sharp_lidar:main',
             'robot_navigator = py_pubsub.robot_navigator:main',
             'gotodock = py_pubsub.gotodock:main',
+            'gotogoal = py_pubsub.gotogoal:main',
+            'goalpub = py_pubsub.goalpub:main',
             'go_to_origin = py_pubsub.go_to_origin:main',
             'aruco_dock = py_pubsub.aruco_dock:main',
             'aruco_dock_2 = py_pubsub.aruco_dock_2:main',

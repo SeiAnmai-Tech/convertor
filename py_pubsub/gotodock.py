@@ -44,7 +44,7 @@ import math
 from geometry_msgs.msg import Pose, Twist
 
 class NavigationResult(Enum):
-    UKNOWN = 0
+    UNKNOWN = 0
     SUCCEEDED = 1
     CANCELED = 2
     FAILED = 3 
@@ -119,7 +119,36 @@ class BasicNavigator(Node):
         self.cmd.angular.z = 0.0
 
         self.timer = self.create_timer(0.1, self.timer_callback)
+        self.flag = 0
 
+    def timer_callback(self):
+        if self.flag == 1:
+            trans = [0.0, 0.0, 0.0]
+            trans[0] = (self.pose1.position.z + self.pose2.position.z) / 2.0
+            trans[1] = (- self.pose1.position.x - self.pose2.position.x) / 2.0
+            trans[2] = (- self.pose1.position.y - self.pose2.position.y) / 2.0
+
+            dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
+            angular = 2.0 * math.atan2(trans[1], trans[0])
+            linear = 0.1 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
+            print(dist)
+
+            if dist < 0.165:
+                # self.cmd.linear.x = linear
+                # self.cmd.angular.z = angular
+                # self.publisher.publish(self.cmd)
+                # time.sleep(0.2)
+                self.cmd.linear.x = 0.0
+                self.cmd.angular.z = 0.0
+                docked = Bool()
+                docked.data = True
+                self.publisher.publish(self.cmd)
+                self.docked_pub.publish(docked)
+                exit(0)
+            elif dist >= 0.165:
+                self.cmd.linear.x = linear
+                self.cmd.angular.z = angular
+                self.publisher.publish(self.cmd)
 
     def pose1_callback(self, msg):
         self.pose1 = msg
@@ -359,41 +388,13 @@ def main():
     result = navigator.getResult()
     if result == NavigationResult.SUCCEEDED:
         print('Goal succeeded!')
+        navigator.flag = 1
     elif result == NavigationResult.CANCELED:
         print('Goal was canceled!')
     elif result == NavigationResult.FAILED:
         print('Goal failed!')
     else:
         print('Goal has an invalid return status!')
-
-    while navigator.isNavComplete():
-
-        trans = [0.0, 0.0, 0.0]
-        trans[0] = (navigator.pose1.position.z + navigator.pose2.position.z) / 2.0
-        trans[1] = (- navigator.pose1.position.x - navigator.pose2.position.x) / 2.0
-        trans[2] = (- navigator.pose1.position.y - navigator.pose2.position.y) / 2.0
-
-        dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-        angular = 2.0 * math.atan2(trans[1], trans[0])
-        linear = 0.1 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-        print(dist)
-
-        if dist < 0.165:
-            # self.cmd.linear.x = linear
-            # self.cmd.angular.z = angular
-            # self.publisher.publish(self.cmd)
-            # time.sleep(0.2)
-            navigator.cmd.linear.x = 0.0
-            navigator.cmd.angular.z = 0.0
-            docked = Bool()
-            docked.data = navigator
-            navigator.publisher.publish(navigator.cmd)
-            navigator.docked_pub.publish(docked)
-            exit(0)
-        elif dist >= 0.165:
-            navigator.cmd.linear.x = linear
-            navigator.cmd.angular.z = angular
-            navigator.publisher.publish(navigator.cmd)
 
 
 if __name__ == '__main__':

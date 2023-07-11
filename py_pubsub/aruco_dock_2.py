@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Int32
 from geometry_msgs.msg import Pose, Twist
 import math
 
@@ -10,6 +10,7 @@ class PoseSubscriber(Node):
         super().__init__('pose_subscriber')
         self.pose1 = None
         self.pose2 = None
+        self.hall_value = 0
 
         self.subscription1 = self.create_subscription(
             Pose,
@@ -24,6 +25,13 @@ class PoseSubscriber(Node):
             self.pose2_callback,
             10
         )
+
+        self.subscription3 = self.create_subscription(
+            Int32,
+            '/hall_publisher',
+            self.hall_callback,
+            10
+        )
         
         self.docked_pub = self.create_publisher(Bool, 'docked', 10)
 
@@ -36,7 +44,7 @@ class PoseSubscriber(Node):
         self.cmd.angular.y = 0.0
         self.cmd.angular.z = 0.0
 
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.timer = self.create_timer(0.05, self.timer_callback)
 
     def pose1_callback(self, msg):
         self.pose1 = msg
@@ -46,6 +54,9 @@ class PoseSubscriber(Node):
         self.pose2 = msg
         # self.get_logger().info('Received Pose2')
 
+    def hall_callback(self, msg):
+        self.hall_value = msg.data
+
     def timer_callback(self):
         trans = [0.0, 0.0, 0.0]
         trans[0] = (self.pose1.position.z + self.pose2.position.z) / 2.0
@@ -53,11 +64,12 @@ class PoseSubscriber(Node):
         trans[2] = (- self.pose1.position.y - self.pose2.position.y) / 2.0
 
         dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-        angular = 2.0 * math.atan2(trans[1], trans[0])
+        angular = 1.5 * math.atan2(trans[1], trans[0])
         linear = 0.1 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
         print(dist)
 
-        if dist < 0.165:
+        # if dist < 0.175:
+        if self.hall_value > 2300:
             # self.cmd.linear.x = linear
             # self.cmd.angular.z = angular
             # self.publisher.publish(self.cmd)
@@ -69,7 +81,8 @@ class PoseSubscriber(Node):
             self.publisher.publish(self.cmd)
             self.docked_pub.publish(docked)
             exit(0)
-        elif dist >= 0.165:
+        # elif dist >= 0.175:
+        elif self.hall_value < 2300:
             self.cmd.linear.x = linear
             self.cmd.angular.z = angular
             self.publisher.publish(self.cmd)

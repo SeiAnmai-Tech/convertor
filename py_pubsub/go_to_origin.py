@@ -378,48 +378,6 @@ def main():
     else:
         print('Goal has an invalid return status!')
 
-    # if (navigator.isNavComplete()):
-    #     go_to_aruco_loop = True
-
-    # while go_to_aruco_loop==True:
-    #     try:
-    #         transform0 = navigator.tf_buffer.lookup_transform('base_link', 'dock_visual_0', rclpy.time.Time())
-    #         transform1 = navigator.tf_buffer.lookup_transform('base_link', 'dock_visual_1', rclpy.time.Time())
-            
-    #         trans0 = transform0.transform.translation
-    #         trans1 = transform1.transform.translation
-
-    #         trans = [0.0, 0.0, 0.0]
-    #         trans[0] = (trans1.x + trans0.x) / 2.0
-    #         trans[1] = (trans1.y + trans0.y) / 2.0
-    #         trans[2] = (trans1.z + trans0.z) / 2.0
-
-    #         dist = math.sqrt(trans[0] ** 2 + trans[1] ** 2 + trans[2] ** 2)
-    #         angular = 2.0 * math.atan2(trans[1], trans[0])
-    #         linear = 0.07 * math.sqrt(trans[0] ** 2 + trans[1] ** 2)
-    #         print(dist)
-
-    #         if dist < 0.53 and navigator.docked.data == False:
-    #             navigator.cmd.linear.x = linear
-    #             navigator.cmd.angular.z = angular
-    #             navigator.publisher.publish(navigator.cmd)
-    #             time.sleep(0.2)
-    #             navigator.cmd.linear.x = 0.0
-    #             navigator.cmd.angular.z = 0.0
-    #             navigator.docked.data = True
-    #             navigator.publisher.publish(self.cmd)
-    #             navigator.docked_pub.publish(self.docked)
-    #             go_to_aruco_loop = False
-
-    #         if dist >= 0.53:
-    #             navigator.cmd.linear.x = linear
-    #             navigator.cmd.angular.z = angular
-    #             navigator.publisher.publish(navigator.cmd)
-
-    #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-    #         navigator.cmd.linear.x = 0.0
-    #         navigator.cmd.angular.z = 0.0
-
     exit(0)
 
 if __name__ == '__main__':
